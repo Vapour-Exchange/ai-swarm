@@ -1,0 +1,152 @@
+{% extends "base.html" %} {% block title %}Agent Connections - Swarm Agent API{%
+endblock %} {% block content %}
+<h1 class="text-3xl font-bold mb-4">Agent Connections</h1>
+
+<div id="workflow-container" class="border rounded-lg p-4 mb-8"></div>
+
+<div class="mb-4">
+  <h2 class="text-2xl font-bold mb-2">Add Connection</h2>
+  <form id="connection-form" class="space-y-4">
+    <div>
+      <label for="from_agent" class="block text-sm font-medium text-gray-700"
+        >From Agent</label
+      >
+      <select
+        id="from_agent"
+        name="from_agent"
+        required
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+      >
+        {% for agent in agents %}
+        <option value="{{ agent }}">{{ agent }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="to_agent" class="block text-sm font-medium text-gray-700"
+        >To Agent</label
+      >
+      <select
+        id="to_agent"
+        name="to_agent"
+        required
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+      >
+        {% for agent in agents %}
+        <option value="{{ agent }}">{{ agent }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <button
+        type="button"
+        id="connect-btn"
+        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      >
+        Connect Agents
+      </button>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.3.0/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+
+  const agents = {{ agents|tojson }};
+  const connections = {{ connections|tojson }};
+
+  function updateGraph() {
+    let graphDefinition = 'flowchart TD\n';
+    agents.forEach(agent => {
+      graphDefinition += `    ${agent.replace(/\s+/g, '_')}["${agent}"]\n`;
+    });
+    connections.forEach(conn => {
+      const sourceId = conn.source.replace(/\s+/g, '_');
+      const targetId = conn.target.replace(/\s+/g, '_');
+      graphDefinition += `    ${sourceId} -->|"Disconnect"| ${targetId}\n`;
+    });
+
+    const workflowContainer = document.getElementById('workflow-container');
+    workflowContainer.innerHTML = `<div class="mermaid">${graphDefinition}</div>`;
+
+    mermaid.run();
+
+    // Add click event listeners to the "Disconnect" labels
+    setTimeout(() => {
+      document.querySelectorAll('.edgeLabel').forEach(label => {
+        label.style.cursor = 'pointer';
+        label.addEventListener('click', (e) => {
+          const edgeId = e.target.closest('.edgeLabel').id;
+          const [sourceId, targetId] = edgeId.split('-');
+          const source = agents.find(a => a.replace(/\s+/g, '_') === sourceId);
+          const target = agents.find(a => a.replace(/\s+/g, '_') === targetId);
+          if (source && target) {
+            disconnectAgents(source, target);
+          }
+        });
+      });
+    }, 100);
+  }
+
+  function connectAgents(fromAgent, toAgent) {
+    fetch("/update-connections", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        from_agent: fromAgent,
+        to_agent: toAgent,
+        action: 'connect',
+      }),
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error("Failed to connect agents");
+      }
+      return response.json();
+    }).then(data => {
+      connections.push({ source: fromAgent, target: toAgent });
+      updateGraph();
+    }).catch(error => {
+      console.error("Error:", error);
+      alert("Failed to connect agents. Please try again.");
+    });
+  }
+
+  function disconnectAgents(fromAgent, toAgent) {
+    fetch("/update-connections", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        from_agent: fromAgent,
+        to_agent: toAgent,
+        action: 'disconnect',
+      }),
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error("Failed to disconnect agents");
+      }
+      return response.json();
+    }).then(data => {
+      connections = connections.filter(conn => !(conn.source === fromAgent && conn.target === toAgent));
+      updateGraph();
+    }).catch(error => {
+      console.error("Error:", error);
+      alert("Failed to disconnect agents. Please try again.");
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    updateGraph();
+
+    document.getElementById("connect-btn").addEventListener("click", () => {
+      const fromAgent = document.getElementById("from_agent").value;
+      const toAgent = document.getElementById("to_agent").value;
+      connectAgents(fromAgent, toAgent);
+    });
+  });
+</script>
+{% endblock %}

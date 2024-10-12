@@ -1,0 +1,17 @@
+{% extends "base.html" %} {% block title %}Home - Swarm Agent API{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-4">Welcome to Swarm Agent API</h1>
+<p class="mb-4">This is a simple interface to interact with Swarm Agents.</p>
+<div class="space-y-4">
+  <a
+    href="/agents"
+    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+    >View Agents</a
+  >
+  <a
+    href="/run"
+    class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+    >Run Agent</a
+  >
+</div>
+{% endblock %}
